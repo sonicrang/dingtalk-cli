@@ -257,13 +257,101 @@ CLI_ANYTHING_FORCE_INSTALLED=1 python3 -m pytest cli_anything/dingtalk_nodejs_sd
 
 ## Architecture
 
+- **CLI version**: 1.2.0
+- **Wrapped backend**: `@alicloud/dingtalk` v2.2.29 (121 API modules)
+- **Backend CLI**: `node` + `node_bridge.js` (custom bridge)
+
 The CLI is a Python Click frontend that calls the real Node.js SDK via a
 bridge script (`node_bridge.js`). It does **not** reimplement any DingTalk
-APIs in Python. The bridge loads `ts/dist/index.js` and provides:
+APIs in Python.
 
-- Module discovery (`list_modules`)
-- Method inspection (`module_methods`)
-- Generic API calls (`call`) with optional headers via `*WithOptions`
+### Backend Engine
+
+- **Language**: TypeScript/JavaScript compiled to `ts/dist/index.js`
+- **Framework**: `@alicloud/openapi-client` + `@alicloud/tea-typescript`
+- **Pattern**: Each module has a `default` export (client class) with methods
+  like `getAccessToken`, `getUser`, etc., plus `*WithOptions` variants for
+  custom headers/runtime config.
+
+### Data Model
+
+- SDK modules are keyed by name (e.g. `oauth2_1_0`, `contact_1_0`)
+- Each module exports Request/Response/Headers classes alongside the client
+- API calls accept typed Request objects or plain JS objects
+- Responses have a `.toMap()` method for JSON serialisation
+
+### Node Bridge
+
+The bridge script (`node_bridge.js`) loads the local SDK from `ts/dist/index.js`,
+accepts JSON payloads on stdin, and supports the following actions:
+
+- `list_modules` — module discovery
+- `module_methods` — method inspection
+- `module_describe` / `method_describe` — schema introspection with deep field types
+- `modules_stats` — SDK-wide statistics
+- `call` — instantiates the client, invokes the method, serialises the result;
+  supports `*WithOptions` methods for custom headers
+
+### Schema Introspection
+
+The bridge provides rich schema information for request/response parameters:
+
+- **Deep type resolution**: Nested Tea Model classes are recursively resolved
+  into JSON-serializable schemas (up to 4 levels for module_describe, 6 for
+  method_describe). Types include primitives, arrays, maps, and nested models.
+- **JSDoc annotations**: `@remarks This parameter is required.` and `@example`
+  values are extracted from `.d.ts` files and merged into field schemas.
+- **API metadata**: HTTP method, pathname, authType, protocol, and other
+  routing metadata are extracted from the `WithOptions` method source code.
+- **Parameter locations**: Each request field is classified as `body`, `query`,
+  or `path` based on how it is used in the `WithOptions` method.
+- **Path parameters**: Template variables in pathname (e.g. `${corpId}`) are
+  detected and listed separately.
+- **Method descriptions**: Chinese/English descriptions from JSDoc comments.
+
+Each field in the schema has the structure:
+```json
+{
+  "type": "string | number | boolean | { type: array, itemType: ... } | { type: map, ... } | { type: model, className: ..., fields: {...} }",
+  "wireName": "the_json_key",
+  "required": true,
+  "example": "value"
+}
+```
+
+## Design Decisions
+
+1. **Python frontend, Node backend**: The CLI is a Python Click app that calls
+   Node.js to invoke the real SDK — using the real software, not reimplementing it.
+
+2. **No live API calls in tests**: Module discovery and method inspection work
+   offline against the local SDK. Live API calls require valid DingTalk
+   credentials.
+
+3. **Session state**: In-memory with optional file persistence and undo/redo.
+   The REPL maintains state across commands; one-shot CLI invocations start
+   fresh unless `--project` is specified.
+
+4. **Project files**: JSON configs storing app credentials, default module,
+   cached access token with expiry, and saved headers. Token auto-refresh is
+   supported when credentials are present.
+
+5. **Unified schema envelope**: All schema outputs use a stable JSON envelope
+   with `$schema.version` so agents can reliably parse and depend on the format.
+
+6. **Pre-call validation**: `backend validate` and `backend call --validate`
+   check request fields against the schema before making API calls.
+
+7. **Structured errors**: All errors in `--json` mode return a machine-readable
+   error object with code, message, and optional detail.
+
+8. **Prerequisite diagnostics**: `backend check --diagnose` provides pass/fail
+   for each infrastructure component with fix suggestions. `backend setup`
+   automates npm install + build.
+
+9. **Project auth injection**: When a project with app credentials is loaded,
+   `backend call` automatically fetches/refreshes the access token and injects
+   it into request headers. Disable with `--no-auto-token`.
 
 ## Command Reference
 
