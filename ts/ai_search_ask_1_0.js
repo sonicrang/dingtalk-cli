@@ -1,0 +1,1 @@
+module.exports = require('./dist').ai_search_ask_1_0;

@@ -1,0 +1,1 @@
+module.exports = require('./dist').salary_1_0;

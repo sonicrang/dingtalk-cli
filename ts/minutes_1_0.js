@@ -1,0 +1,1 @@
+module.exports = require('./dist').minutes_1_0;

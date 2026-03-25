@@ -1,0 +1,1 @@
+module.exports = require('./dist').shangou_1_0;

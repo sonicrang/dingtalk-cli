@@ -1,0 +1,1 @@
+module.exports = require('./dist').vip_member_1_0;

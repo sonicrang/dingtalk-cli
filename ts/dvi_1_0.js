@@ -1,0 +1,1 @@
+module.exports = require('./dist').dvi_1_0;

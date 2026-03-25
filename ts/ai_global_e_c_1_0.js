@@ -1,0 +1,1 @@
+module.exports = require('./dist').ai_global_e_c_1_0;

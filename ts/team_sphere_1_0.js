@@ -1,0 +1,1 @@
+module.exports = require('./dist').team_sphere_1_0;

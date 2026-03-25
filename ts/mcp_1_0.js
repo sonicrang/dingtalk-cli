@@ -1,0 +1,1 @@
+module.exports = require('./dist').mcp_1_0;

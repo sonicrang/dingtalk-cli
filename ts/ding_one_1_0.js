@@ -1,0 +1,1 @@
+module.exports = require('./dist').ding_one_1_0;
